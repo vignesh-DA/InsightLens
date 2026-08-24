@@ -1,0 +1,17 @@
+[project]
+name = "nlp-cap"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "vignesh-DA", email = "gogulavignesh9.com" }
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+nlp-cap = "nlp_cap:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
