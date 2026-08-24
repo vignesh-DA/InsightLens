@@ -22,7 +22,7 @@ def get_llm() -> ChatGroq:
 
     return ChatGroq(
         api_key=GROQ_API_KEY,
-        model_name="llama-3.3-70b-versatile",
+        model_name="openai/gpt-oss-120b",
         temperature=0.3,  # Low temp for consistent structured output
         max_tokens=2048,
     )
