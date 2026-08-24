@@ -36,24 +36,36 @@ async def analyze(request: ReviewRequest):
         overall_sentiment, confidence = predict_sentiment(request.review_text)
 
         # Step 2: LLM pipeline — aspects, reasoning, recommendations
-        llm_result = await analyze_review(request.review_text)
+        try:
+            llm_result = await analyze_review(request.review_text)
 
-        # Step 3: Merge results
-        response = AnalysisResponse(
-            overall_sentiment=overall_sentiment,
-            baseline_model_confidence=confidence,
-            reasoning=llm_result.reasoning,
-            aspects=[
-                AspectSentimentResponse(
-                    feature=aspect.feature,
-                    sentiment=aspect.sentiment,
-                )
-                for aspect in llm_result.aspects
-            ],
-            recommended_features=llm_result.recommended_features,
-        )
+            # Step 3: Merge results
+            response = AnalysisResponse(
+                overall_sentiment=overall_sentiment,
+                baseline_model_confidence=confidence,
+                reasoning=llm_result.reasoning,
+                aspects=[
+                    AspectSentimentResponse(
+                        feature=aspect.feature,
+                        sentiment=aspect.sentiment,
+                    )
+                    for aspect in llm_result.aspects
+                ],
+                recommended_features=llm_result.recommended_features,
+            )
+            return response
 
-        return response
+        except Exception as llm_error:
+            # Fallback mechanism: if LLM fails, still return the baseline model's results
+            print(f"[!] LLM Analysis failed: {llm_error}. Falling back to baseline model.")
+            
+            return AnalysisResponse(
+                overall_sentiment=overall_sentiment,
+                baseline_model_confidence=confidence,
+                reasoning=f"The overall sentiment is {overall_sentiment}. (Note: Detailed LLM analysis is currently unavailable, showing fallback baseline model results).",
+                aspects=[],
+                recommended_features=["(AI recommendations currently unavailable)"]
+            )
 
     except FileNotFoundError as e:
         raise HTTPException(
