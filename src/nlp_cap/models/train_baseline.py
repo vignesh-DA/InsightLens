@@ -1,18 +1,20 @@
 """
 train_baseline.py
 Trains TF-IDF + Logistic Regression and Multinomial Naive Bayes models
-on the prepared Amazon Reviews dataset. Evaluates both and saves the
-best performer as the production model.
+on the prepared Amazon Reviews dataset. Performs hyperparameter tuning
+using GridSearchCV, evaluates both, and saves the best performer.
 """
 
 import os
+import time
 import joblib
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.pipeline import Pipeline
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -57,9 +59,9 @@ def evaluate_model(name, model, X_test, y_test):
     rec = recall_score(y_test, y_pred, average="weighted")
     f1 = f1_score(y_test, y_pred, average="weighted")
 
-    print(f"\n{'='*50}")
-    print(f"[+] {name} Results")
-    print(f"{'='*50}")
+    print(f"\n{'='*60}")
+    print(f"[+] {name} — Test Set Results")
+    print(f"{'='*60}")
     print(f"    Accuracy:  {acc:.4f}")
     print(f"    Precision: {prec:.4f}")
     print(f"    Recall:    {rec:.4f}")
@@ -73,8 +75,104 @@ def evaluate_model(name, model, X_test, y_test):
     return acc, f1
 
 
+def tune_logistic_regression(X_train, y_train):
+    """Hyperparameter tuning for TF-IDF + Logistic Regression using GridSearchCV."""
+    print("\n" + "=" * 60)
+    print("[*] Tuning Logistic Regression (GridSearchCV, 5-fold CV)...")
+    print("=" * 60)
+
+    pipeline = Pipeline([
+        ("tfidf", TfidfVectorizer(strip_accents="unicode", lowercase=True)),
+        ("clf", LogisticRegression(random_state=42)),
+    ])
+
+    param_grid = {
+        # TF-IDF hyperparameters
+        "tfidf__max_features": [5000, 10000, 20000],
+        "tfidf__ngram_range": [(1, 1), (1, 2)],
+        "tfidf__min_df": [2, 3],
+        "tfidf__max_df": [0.90, 0.95],
+        # Logistic Regression hyperparameters
+        "clf__C": [0.1, 1.0, 10.0],
+        "clf__solver": ["lbfgs", "liblinear"],
+        "clf__max_iter": [1000],
+    }
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    grid_search = GridSearchCV(
+        pipeline,
+        param_grid,
+        cv=cv,
+        scoring="f1_weighted",
+        n_jobs=-1,  # Use all CPU cores
+        verbose=1,
+        return_train_score=True,
+    )
+
+    start = time.time()
+    grid_search.fit(X_train, y_train)
+    elapsed = time.time() - start
+
+    print(f"\n[+] LR Grid Search completed in {elapsed:.1f}s")
+    print(f"    Combinations tested: {len(grid_search.cv_results_['mean_test_score'])}")
+    print(f"    Best CV F1 Score:    {grid_search.best_score_:.4f}")
+    print(f"    Best Parameters:")
+    for param, value in grid_search.best_params_.items():
+        print(f"      {param}: {value}")
+
+    return grid_search.best_estimator_, grid_search.best_params_, grid_search.best_score_
+
+
+def tune_naive_bayes(X_train, y_train):
+    """Hyperparameter tuning for TF-IDF + Multinomial Naive Bayes using GridSearchCV."""
+    print("\n" + "=" * 60)
+    print("[*] Tuning Multinomial Naive Bayes (GridSearchCV, 5-fold CV)...")
+    print("=" * 60)
+
+    pipeline = Pipeline([
+        ("tfidf", TfidfVectorizer(strip_accents="unicode", lowercase=True)),
+        ("clf", MultinomialNB()),
+    ])
+
+    param_grid = {
+        # TF-IDF hyperparameters
+        "tfidf__max_features": [5000, 10000, 20000],
+        "tfidf__ngram_range": [(1, 1), (1, 2)],
+        "tfidf__min_df": [2, 3],
+        "tfidf__max_df": [0.90, 0.95],
+        # Naive Bayes hyperparameters
+        "clf__alpha": [0.01, 0.1, 0.5, 1.0, 2.0],
+    }
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    grid_search = GridSearchCV(
+        pipeline,
+        param_grid,
+        cv=cv,
+        scoring="f1_weighted",
+        n_jobs=-1,
+        verbose=1,
+        return_train_score=True,
+    )
+
+    start = time.time()
+    grid_search.fit(X_train, y_train)
+    elapsed = time.time() - start
+
+    print(f"\n[+] NB Grid Search completed in {elapsed:.1f}s")
+    print(f"    Combinations tested: {len(grid_search.cv_results_['mean_test_score'])}")
+    print(f"    Best CV F1 Score:    {grid_search.best_score_:.4f}")
+    print(f"    Best Parameters:")
+    for param, value in grid_search.best_params_.items():
+        print(f"      {param}: {value}")
+
+    return grid_search.best_estimator_, grid_search.best_params_, grid_search.best_score_
+
+
 def train():
-    """Train, evaluate, and save the best baseline model."""
+    """Train, tune, evaluate, and save the best baseline model."""
     # Load data
     df = load_data()
     X = df["review_text"].tolist()
@@ -86,56 +184,47 @@ def train():
     )
     print(f"[i] Split: {len(X_train):,} train / {len(X_test):,} test")
 
-    # TF-IDF Vectorization
-    print("\n[*] Fitting TF-IDF Vectorizer...")
-    vectorizer = TfidfVectorizer(
-        max_features=10000,
-        ngram_range=(1, 2),  # Unigrams + bigrams
-        min_df=2,
-        max_df=0.95,
-        strip_accents="unicode",
-        lowercase=True,
-    )
-    X_train_tfidf = vectorizer.fit_transform(X_train)
-    X_test_tfidf = vectorizer.transform(X_test)
-    print(f"    Vocabulary size: {len(vectorizer.vocabulary_):,} features")
+    # --- Hyperparameter Tuning ---
+    lr_pipeline, lr_params, lr_cv_f1 = tune_logistic_regression(X_train, y_train)
+    nb_pipeline, nb_params, nb_cv_f1 = tune_naive_bayes(X_train, y_train)
 
-    # --- Train Logistic Regression ---
-    print("\n[*] Training Logistic Regression...")
-    lr_model = LogisticRegression(
-        max_iter=1000,
-        C=1.0,
-        solver="lbfgs",
-        random_state=42,
-    )
-    lr_model.fit(X_train_tfidf, y_train)
-    lr_acc, lr_f1 = evaluate_model("Logistic Regression", lr_model, X_test_tfidf, y_test)
+    # --- Final Evaluation on held-out test set ---
+    print("\n\n" + "#" * 60)
+    print("  FINAL EVALUATION ON HELD-OUT TEST SET")
+    print("#" * 60)
 
-    # --- Train Multinomial Naive Bayes ---
-    print("\n[*] Training Multinomial Naive Bayes...")
-    nb_model = MultinomialNB(alpha=1.0)
-    nb_model.fit(X_train_tfidf, y_train)
-    nb_acc, nb_f1 = evaluate_model("Multinomial Naive Bayes", nb_model, X_test_tfidf, y_test)
+    lr_acc, lr_f1 = evaluate_model("Logistic Regression (Tuned)", lr_pipeline, X_test, y_test)
+    nb_acc, nb_f1 = evaluate_model("Multinomial Naive Bayes (Tuned)", nb_pipeline, X_test, y_test)
 
     # --- Select and save best model ---
     if lr_f1 >= nb_f1:
-        best_model = lr_model
+        best_pipeline = lr_pipeline
         best_name = "Logistic Regression"
+        best_params = lr_params
     else:
-        best_model = nb_model
+        best_pipeline = nb_pipeline
         best_name = "Multinomial Naive Bayes"
+        best_params = nb_params
 
-    print(f"\n{'='*50}")
-    print(f"[+] Best model: {best_name} (F1={max(lr_f1, nb_f1):.4f})")
-    print(f"{'='*50}")
+    print(f"\n{'='*60}")
+    print(f"[+] WINNER: {best_name} (Test F1={max(lr_f1, nb_f1):.4f})")
+    print(f"{'='*60}")
+    print(f"    Best hyperparameters:")
+    for param, value in best_params.items():
+        print(f"      {param}: {value}")
 
-    # Save vectorizer and model
-    joblib.dump(vectorizer, VECTORIZER_PATH)
+    # Extract vectorizer and classifier from the winning pipeline
+    best_vectorizer = best_pipeline.named_steps["tfidf"]
+    best_model = best_pipeline.named_steps["clf"]
+
+    # Save vectorizer and model separately (for loading in baseline_model.py)
+    joblib.dump(best_vectorizer, VECTORIZER_PATH)
     joblib.dump(best_model, MODEL_PATH)
     print(f"\n[+] Saved vectorizer -> {VECTORIZER_PATH}")
     print(f"[+] Saved model     -> {MODEL_PATH}")
-    print("\n[+] Training complete!")
+    print("\n[+] Training with hyperparameter tuning complete!")
 
 
 if __name__ == "__main__":
     train()
+
