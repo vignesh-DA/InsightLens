@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="InsightLens — AI-powered product review analysis with aspect-based sentiment, reasoning, and feature recommendations.">
+    <title>InsightLens — Intelligent Product Review Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Ambient background effects -->
+    <div class="ambient-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <circle cx="16" cy="16" r="14" stroke="url(#logo-grad)" stroke-width="2.5"/>
+                        <circle cx="16" cy="16" r="6" fill="url(#logo-grad)"/>
+                        <line x1="16" y1="2" x2="16" y2="8" stroke="url(#logo-grad)" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="16" y1="24" x2="16" y2="30" stroke="url(#logo-grad)" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="2" y1="16" x2="8" y2="16" stroke="url(#logo-grad)" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="24" y1="16" x2="30" y2="16" stroke="url(#logo-grad)" stroke-width="2" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32">
+                                <stop offset="0%" stop-color="#6366f1"/>
+                                <stop offset="100%" stop-color="#a855f7"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <h1>InsightLens</h1>
+            </div>
+            <p class="tagline">AI-Powered Product Review Intelligence</p>
+        </header>
+
+        <!-- Input Section -->
+        <main>
+            <section class="input-section glass-card" id="input-section">
+                <div class="section-header">
+                    <span class="section-icon">📝</span>
+                    <h2>Paste Your Review</h2>
+                </div>
+                <textarea
+                    id="review-input"
+                    placeholder="Paste a product review here... e.g., 'The battery life on this phone is absolutely terrible — barely lasts half a day with normal use. However, the camera quality is stunning, especially in low light. Build quality feels premium but it's way too expensive for what you get.'"
+                    rows="5"
+                ></textarea>
+                <div class="input-footer">
+                    <span class="char-count" id="char-count">0 / 5000</span>
+                    <button class="analyze-btn" id="analyze-btn" onclick="analyzeReview()">
+                        <span class="btn-text">Analyze Review</span>
+                        <span class="btn-icon">→</span>
+                        <div class="btn-loader" id="btn-loader">
+                            <div class="spinner"></div>
+                        </div>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Loading State -->
+            <section class="loading-section" id="loading-section" style="display: none;">
+                <div class="loading-card glass-card">
+                    <div class="pulse-ring"></div>
+                    <div class="loading-icon">🔍</div>
+                    <h3>Analyzing your review...</h3>
+                    <p>Running baseline model & LLM pipeline</p>
+                    <div class="loading-steps">
+                        <div class="step active" id="step-1">
+                            <div class="step-dot"></div>
+                            <span>Classifying overall sentiment</span>
+                        </div>
+                        <div class="step" id="step-2">
+                            <div class="step-dot"></div>
+                            <span>Extracting product aspects</span>
+                        </div>
+                        <div class="step" id="step-3">
+                            <div class="step-dot"></div>
+                            <span>Generating reasoning & recommendations</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Error State -->
+            <section class="error-section glass-card" id="error-section" style="display: none;">
+                <div class="error-content">
+                    <span class="error-icon">⚠️</span>
+                    <h3 id="error-title">Analysis Failed</h3>
+                    <p id="error-message">Something went wrong. Please try again.</p>
+                    <button class="retry-btn" onclick="resetUI()">Try Again</button>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="results-section" style="display: none;">
+
+                <!-- Overall Sentiment Card -->
+                <div class="result-card glass-card sentiment-card" id="sentiment-card">
+                    <div class="section-header">
+                        <span class="section-icon">🎯</span>
+                        <h2>Overall Sentiment</h2>
+                    </div>
+                    <div class="sentiment-display">
+                        <div class="sentiment-badge" id="sentiment-badge">
+                            <span class="badge-icon" id="badge-icon"></span>
+                            <span class="badge-label" id="badge-label"></span>
+                        </div>
+                        <div class="confidence-meter">
+                            <div class="confidence-label">
+                                <span>Model Confidence</span>
+                                <span class="confidence-value" id="confidence-value"></span>
+                            </div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" id="confidence-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reasoning Card -->
+                <div class="result-card glass-card reasoning-card" id="reasoning-card">
+                    <div class="section-header">
+                        <span class="section-icon">💡</span>
+                        <h2>Why This Verdict?</h2>
+                    </div>
+                    <p class="reasoning-text" id="reasoning-text"></p>
+                </div>
+
+                <!-- Aspects Card -->
+                <div class="result-card glass-card aspects-card" id="aspects-card">
+                    <div class="section-header">
+                        <span class="section-icon">🏷️</span>
+                        <h2>Feature Breakdown</h2>
+                    </div>
+                    <div class="aspects-grid" id="aspects-grid"></div>
+                </div>
+
+                <!-- Recommendations Card -->
+                <div class="result-card glass-card recommendations-card" id="recommendations-card">
+                    <div class="section-header">
+                        <span class="section-icon">🚀</span>
+                        <h2>Suggested Improvements</h2>
+                    </div>
+                    <ul class="recommendations-list" id="recommendations-list"></ul>
+                </div>
+
+                <!-- New Analysis Button -->
+                <div class="new-analysis">
+                    <button class="new-btn" onclick="resetUI()">
+                        <span>← Analyze Another Review</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Built with <span class="heart">♥</span> using FastAPI, scikit-learn, LangChain & Groq</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

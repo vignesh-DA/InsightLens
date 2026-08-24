@@ -6,5 +6,29 @@ dist/
 wheels/
 *.egg-info
 
-# Virtual environments
-.venv
+# Virtual env
+.venv/
+
+# Environment variables
+.env
+
+# Trained model files
+*.pkl
+
+# Dataset (downloaded, not committed)
+src/nlp_cap/data/*.csv
+
+# Jupyter notebooks
+notebooks/.ipynb_checkpoints/
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prompt file
+prompt.md
